@@ -154,6 +154,7 @@ export default function HomePage() {
     }
   };
 
+
   // Upload and process
   const handleUpload = async () => {
     console.log('Upload button clicked');
@@ -208,11 +209,11 @@ export default function HomePage() {
       const urls = isLocalhost ? [
         'http://localhost:5000/upload',
         'http://192.168.137.1:5000/upload',
-        'https://f1-champ-tracker.vercel.app/upload'
+        'https://f-backend-deploy.onrender.com/upload'
       ] : [
         'http://192.168.137.1:5000/upload',
         'http://localhost:5000/upload',
-        'https://f1-champ-tracker.vercel.app/upload'
+        'https://f-backend-deploy.onrender.com/upload'
       ];
       
       console.log('Environment detected:', { isLocalhost, isHttps, hostname: window.location.hostname });
