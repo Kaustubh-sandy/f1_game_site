@@ -47,6 +47,7 @@ type PodiumEntry = {
 
 export default function HomePage() {
   const [numPlayers, setNumPlayers] = useState(1);
+  const [numPlayersInput, setNumPlayersInput] = useState('1');
   const [players, setPlayers] = useState<Player[]>([{ currentName: '', currentTeam: '', aliases: [] }]);
   const [standings, setStandings] = useState<StandingEntry[]>([]);
   const [csvFiles, setCsvFiles] = useState<FileList | null>(null);
@@ -59,14 +60,38 @@ export default function HomePage() {
 
   // Handle number of players change
   const handleNumPlayersChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const n = Math.max(1, parseInt(e.target.value) || 1);
-    setNumPlayers(n);
-    setPlayers((prev) => {
-      const arr = [...prev];
-      while (arr.length < n) arr.push({ currentName: '', currentTeam: '', aliases: [] });
-      while (arr.length > n) arr.pop();
-      return arr;
-    });
+    const value = e.target.value;
+    setNumPlayersInput(value); // Always update the input value
+    
+    // Allow empty input for better UX
+    if (value === '') {
+      return;
+    }
+    
+    const n = parseInt(value);
+    
+    // Only update players if it's a valid number
+    if (!isNaN(n) && n >= 1) {
+      setNumPlayers(n);
+      setPlayers((prev) => {
+        const arr = [...prev];
+        while (arr.length < n) arr.push({ currentName: '', currentTeam: '', aliases: [] });
+        while (arr.length > n) arr.pop();
+        return arr;
+      });
+    }
+  };
+
+  // Handle blur to ensure valid value
+  const handleNumPlayersBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const n = parseInt(value);
+    
+    // If invalid or empty, set to minimum
+    if (isNaN(n) || n < 1 || value === '') {
+      setNumPlayers(1);
+      setNumPlayersInput('1');
+    }
   };
 
   // Handle player info change
@@ -109,11 +134,31 @@ export default function HomePage() {
 
   // Handle file input
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('File input changed:', e.target.files);
+    if (e.target.files && e.target.files.length > 0) {
+      console.log('Files selected:', e.target.files.length);
+      for (let i = 0; i < e.target.files.length; i++) {
+        console.log('File', i, ':', e.target.files[i].name, e.target.files[i].size, 'bytes');
+      }
+    } else {
+      console.log("No file selected or input cancelled");
+    }
     setCsvFiles(e.target.files);
+  };
+
+  // Manual trigger for mobile devices
+  const triggerFileInput = () => {
+    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.click();
+    }
   };
 
   // Upload and process
   const handleUpload = async () => {
+    console.log('Upload button clicked');
+    console.log('CSV files state:', csvFiles);
+    
     // Validate if files are uploaded
     if (!csvFiles || csvFiles.length === 0) {
       alert('⚠️ Please upload CSV files first!');
@@ -154,19 +199,62 @@ export default function HomePage() {
     }
     formData.append('mapping', JSON.stringify(mapping));
 
-    const res = await fetch('http://localhost:5000/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    try {
+      // Detect if we're on HTTPS or localhost for proper URL selection
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const isHttps = window.location.protocol === 'https:';
+      
+      // Try the network IP first, fallback to localhost
+      const urls = isLocalhost ? [
+        'http://localhost:5000/upload',
+        'http://192.168.137.1:5000/upload'
+      ] : [
+        'http://192.168.137.1:5000/upload',
+        'http://localhost:5000/upload'
+      ];
+      
+      console.log('Environment detected:', { isLocalhost, isHttps, hostname: window.location.hostname });
+      
+      let res;
+      let lastError;
+      
+      for (const url of urls) {
+        try {
+          console.log('Attempting to fetch from:', url);
+          res = await fetch(url, {
+            method: 'POST',
+            body: formData,
+          });
+          
+          if (res.ok) {
+            console.log('Successfully connected to:', url);
+            break;
+          }
+        } catch (err) {
+          console.log('Failed to connect to:', url, err);
+          lastError = err;
+        }
+      }
+      
+      if (!res || !res.ok) {
+        throw lastError || new Error('Failed to connect to backend server');
+      }
 
-    const data = await res.json();
-    setStandings(data.standings || []);
-    setMostWins(data.most_wins || []);
-    setPodiums(data.podiums || []);
-    setTeamStandings(data.team_standings || []);
-    setPositionsGained(data.positions_gained || []);
-    setFastestLapPerRace(data.fastest_lap_per_race || []);
-    setMostFastestLaps(data.most_fastest_laps || []);
+      const data = await res.json();
+      console.log('Response received:', data);
+      
+      setStandings(data.standings || []);
+      setMostWins(data.most_wins || []);
+      setPodiums(data.podiums || []);
+      setTeamStandings(data.team_standings || []);
+      setPositionsGained(data.positions_gained || []);
+      setFastestLapPerRace(data.fastest_lap_per_race || []);
+      setMostFastestLaps(data.most_fastest_laps || []);
+    } catch (error) {
+      console.error('Upload failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`❌ Upload failed: ${errorMessage}. Please check your connection and try again.`);
+    }
   };
 
   return (
@@ -203,8 +291,9 @@ export default function HomePage() {
                 <input
                   type="number"
                   min={1}
-                  value={numPlayers}
+                  value={numPlayersInput}
                   onChange={handleNumPlayersChange}
+                  onBlur={handleNumPlayersBlur}
                   className="w-20 px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent bg-black/50 text-white"
                 />
               </div>
@@ -301,15 +390,32 @@ export default function HomePage() {
           {/* File Upload Card */}
           <div className="bg-transparent rounded-2xl shadow-xl p-6 mt-8 mb-8 border border-red-900 backdrop-blur-sm">
             <h2 className="text-2xl font-bold text-white mb-4">Upload Race Data</h2>
-            <div className="flex items-center space-x-4">
-              <div className="flex-1">
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileChange}
-                  className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-red-900/50 file:text-red-300 hover:file:bg-red-800/50"
-                  multiple
-                />
+            <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
+              <div className="flex-1 w-full">
+                <div className="w-full">
+                  <div 
+                    className="border-2 border-dashed border-gray-400 rounded-lg p-4 text-center hover:border-red-400 transition-colors cursor-pointer"
+                    onClick={triggerFileInput}
+                  >
+                    <div className="text-gray-300 mb-2">
+                      📁 Click to select CSV files
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      {csvFiles && csvFiles.length > 0 
+                        ? `${csvFiles.length} file(s) selected` 
+                        : 'No files selected'
+                      }
+                    </div>
+                  </div>
+                  <input
+                    id="file-upload"
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileChange}
+                    className="hidden"
+                    multiple
+                  />
+                </div>
               </div>
               <button
                 type="button"
