@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 
 const F1_TEAMS = [
   "Red Bull",
@@ -26,13 +27,35 @@ type Player = {
   aliases: PlayerAlias[]; // old name/team pairs
 };
 
+type StandingEntry = {
+  driver: string;
+  team: string;
+  points: number;
+};
+
+type WinEntry = {
+  driver: string;
+  team: string;
+  wins: number;
+};
+
+type PodiumEntry = {
+  driver: string;
+  team: string;
+  pos: number;
+};
+
 export default function HomePage() {
   const [numPlayers, setNumPlayers] = useState(1);
   const [players, setPlayers] = useState<Player[]>([{ currentName: '', currentTeam: '', aliases: [] }]);
-  const [standings, setStandings] = useState<any[]>([]);
+  const [standings, setStandings] = useState<StandingEntry[]>([]);
   const [csvFiles, setCsvFiles] = useState<FileList | null>(null);
-  const [mostWins, setMostWins] = useState<any[]>([]);
-  const [podiums, setPodiums] = useState<any[]>([]);
+  const [mostWins, setMostWins] = useState<WinEntry[]>([]);
+  const [podiums, setPodiums] = useState<PodiumEntry[][]>([]);
+  const [teamStandings, setTeamStandings] = useState<{ team: string; points: number }[]>([]);
+  const [positionsGained, setPositionsGained] = useState<{ race: number; driver: string; team: string; gained: number }[]>([]);
+  const [fastestLapPerRace, setFastestLapPerRace] = useState<{ race: number; driver: string; team: string; lap_time: string }[]>([]);
+  const [mostFastestLaps, setMostFastestLaps] = useState<{ driver: string; team: string; count: number }[]>([]);
 
   // Handle number of players change
   const handleNumPlayersChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -91,7 +114,32 @@ export default function HomePage() {
 
   // Upload and process
   const handleUpload = async () => {
-    if (!csvFiles || csvFiles.length === 0) return;
+    // Validate if files are uploaded
+    if (!csvFiles || csvFiles.length === 0) {
+      alert('⚠️ Please upload CSV files first!');
+      return;
+    }
+
+    // Validate if player configuration is filled
+    const hasValidPlayers = players.some(player => 
+      player.currentName.trim() !== '' && player.currentTeam.trim() !== ''
+    );
+
+    if (!hasValidPlayers) {
+      alert('⚠️ Please fill in at least one player configuration (name and team) before calculating standings!');
+      return;
+    }
+
+    // Check if all players have names and teams
+    const incompletePlayers = players.filter(player => 
+      player.currentName.trim() === '' || player.currentTeam.trim() === ''
+    );
+
+    if (incompletePlayers.length > 0) {
+      const incompleteCount = incompletePlayers.length;
+      alert(`⚠️ Please complete the configuration for ${incompleteCount} player${incompleteCount > 1 ? 's' : ''} (name and team are required)!`);
+      return;
+    }
 
     // Prepare mapping info for backend
     const mapping = players.map((p) => ({
@@ -115,167 +163,356 @@ export default function HomePage() {
     setStandings(data.standings || []);
     setMostWins(data.most_wins || []);
     setPodiums(data.podiums || []);
+    setTeamStandings(data.team_standings || []);
+    setPositionsGained(data.positions_gained || []);
+    setFastestLapPerRace(data.fastest_lap_per_race || []);
+    setMostFastestLaps(data.most_fastest_laps || []);
   };
 
   return (
-    <main className="p-8">
-      <h1 className="text-2xl font-bold mb-4">🏁 Upload F1 CSV Results (Multiple)</h1>
+    <div className="min-h-screen w-full relative font-sans" >
+                      {/* Background image with dark overlay */}
+        <div className="fixed inset-0 z-0">
+          <Image
+            src="/assets/F6e6EaIWMAEhbam.jpg"
+            alt="F1 Background"
+            fill
+            className="object-cover object-center"
+            //style={{ filter: 'brightness(0.4) grayscale(0.2)' }}
+            priority
+            unoptimized
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-black/20 via-black/20 to-red-900/40" />
+        </div>
 
-      <div className="mb-4">
-        <label className="font-semibold">How many friends/players?</label>
-        <input
-          type="number"
-          min={1}
-          value={numPlayers}
-          onChange={handleNumPlayersChange}
-          className="ml-2 border px-2 py-1 w-16"
-        />
-      </div>
+        <main className="container mx-auto p-8 max-w-6xl relative z-20">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-extrabold mb-2 bg-gradient-to-r from-red-600 to-white bg-clip-text text-transparent tracking-tight uppercase drop-shadow-lg">
+              🏁 F1 Championship Tracker
+            </h1>
+            <p className="text-gray-200 text-lg font-medium">Track your friends&apos; F1 performance across multiple races</p>
+          </div>
+          {/* Player Configuration Card */}
+          <div className="bg-transparent">
 
-      {players.map((player, pIdx) => (
-        <div key={pIdx} className="mb-4 border p-2 rounded">
-          <div className="mb-2 font-semibold">Player {pIdx + 1}</div>
-          <div className="mb-2">
-            <label>Name: </label>
-            <input
-              type="text"
-              value={player.currentName}
-              onChange={e => handlePlayerChange(pIdx, 'currentName', e.target.value)}
-              className="border px-2 py-1 mr-2"
-            />
-            <label>Team: </label>
-            <select
-            value={player.currentTeam}
-            onChange={e => handlePlayerChange(pIdx, 'currentTeam', e.target.value)}
-            className="border px-2 py-1"
-            >
-            <option value="" style={{ color: '#1d4ed8' }}>Select Team</option>
-            {F1_TEAMS.map(team => (
-            <option key={team} value={team} style={{ color: '#1d4ed8' }}>{team}</option>
-            ))}
-          </select>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white">Player Configuration</h2>
+              <div className="flex items-center space-x-3">
+                <label className="font-medium text-gray-200">Number of Players:</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={numPlayers}
+                  onChange={handleNumPlayersChange}
+                  className="w-20 px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent bg-black/50 text-white"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              {players.map((player, pIdx) => (
+                <div key={pIdx} className="bg-gradient-to-r bg-transparent to-red-900/10 rounded-xl p-6 border border-red-800 backdrop-blur-sm">
+                  <div className="flex items-center mb-4">
+                    <div className="w-8 h-8 bg-gradient-to-r from-red-500 to-red-600 rounded-full flex items-center justify-center text-white font-bold mr-3">
+                      {pIdx + 1}
+                    </div>
+                    <h3 className="text-xl font-semibold text-white">Player {pIdx + 1}</h3>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-200 mb-2">Current Name</label>
+                      <input
+                        type="text"
+                        value={player.currentName}
+                        onChange={e => handlePlayerChange(pIdx, 'currentName', e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all bg-black/50 text-white placeholder-gray-400"
+                        placeholder="Enter player name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-200 mb-2">Current Team</label>
+                      <select
+                        value={player.currentTeam}
+                        onChange={e => handlePlayerChange(pIdx, 'currentTeam', e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all bg-black/50 text-white"
+                      >
+                        <option value="">Select Team</option>
+                        {F1_TEAMS.map(team => (
+                          <option key={team} value={team}>{team}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="text-sm font-medium text-gray-200">Previous Names/Teams</label>
+                      <button
+                        type="button"
+                        className="bg-gradient-to-r from-red-500 to-red-600 text-white px-4 py-2 rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-md"
+                        onClick={() => addAlias(pIdx)}
+                      >
+                        + Add Previous
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      {player.aliases.map((alias, aIdx) => (
+                        <div key={aIdx} className="flex items-center space-x-3 p-3 bg-black/40 rounded-lg border border-gray-700">
+                          <div className="flex-1">
+                            <input
+                              type="text"
+                              value={alias.name}
+                              onChange={e => handleAliasChange(pIdx, aIdx, 'name', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent bg-black/50 text-white placeholder-gray-400"
+                              placeholder="Previous name"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <select
+                              value={alias.team}
+                              onChange={e => handleAliasChange(pIdx, aIdx, 'team', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent bg-black/50 text-white"
+                            >
+                              <option value="">Previous team</option>
+                              {F1_TEAMS.map(team => (
+                                <option key={team} value={team}>{team}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <button
+                            type="button"
+                            className="bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 transition-all duration-200"
+                            onClick={() => removeAlias(pIdx, aIdx)}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-          <div>
-            <label className="mr-2">Did this player switch name/team?</label>
-            <button
-              type="button"
-              className="bg-blue-500 text-white px-2 py-1 rounded"
-              onClick={() => addAlias(pIdx)}
-            >
-              Add Previous Name/Team
-            </button>
-          </div>
-          {player.aliases.map((alias, aIdx) => (
-            <div key={aIdx} className="flex items-center mt-2">
-              <label>Old Name: </label>
-              <input
-                type="text"
-                value={alias.name}
-                onChange={e => handleAliasChange(pIdx, aIdx, 'name', e.target.value)}
-                className="border px-2 py-1 mx-2"
-              />
-              <label>Old Team: </label>
-              <select
-  value={alias.team}
-  onChange={e => handleAliasChange(pIdx, aIdx, 'team', e.target.value)}
-  className="border px-2 py-1"
->
-  <option value="" style={{ color: '#1d4ed8' }}>Select Team</option>
-  {F1_TEAMS.map(team => (
-    <option key={team} value={team} style={{ color: '#1d4ed8' }}>{team}</option>
-  ))}
-</select>
+
+          {/* File Upload Card */}
+          <div className="bg-transparent rounded-2xl shadow-xl p-6 mt-8 mb-8 border border-red-900 backdrop-blur-sm">
+            <h2 className="text-2xl font-bold text-white mb-4">Upload Race Data</h2>
+            <div className="flex items-center space-x-4">
+              <div className="flex-1">
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileChange}
+                  className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-red-900/50 file:text-red-300 hover:file:bg-red-800/50"
+                  multiple
+                />
+              </div>
               <button
                 type="button"
-                className="bg-red-500 text-white px-2 py-1 rounded"
-                onClick={() => removeAlias(pIdx, aIdx)}
+                className="bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-3 rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-md font-medium"
+                onClick={handleUpload}
               >
-                Remove
+                🚀 Calculate Standings
               </button>
             </div>
-          ))}
-        </div>
-      ))}
+          </div>
 
-      <div className="mb-4">
-        <input
-          type="file"
-          accept=".csv"
-          onChange={handleFileChange}
-          className="mb-2"
-          multiple
-        />
-        <button
-          type="button"
-          className="bg-green-600 text-white px-4 py-2 rounded ml-2"
-          onClick={handleUpload}
-        >
-          Upload & Calculate Standings
-        </button>
-      </div>
-
-      <h2 className="text-xl font-semibold mt-6">Final Standings</h2>
-      {standings.length > 0 ? (
-        <table className="mt-2 border-collapse border border-gray-400">
-          <thead>
-            <tr>
-              <th className="border px-2 py-1">Driver</th>
-              <th className="border px-2 py-1">Team</th>
-              <th className="border px-2 py-1">Points</th>
-            </tr>
-          </thead>
-          <tbody>
-            {standings.map((row, i) => (
-              <tr key={i}>
-                <td className="border px-2 py-1">{row.driver}</td>
-                <td className="border px-2 py-1">{row.team}</td>
-                <td className="border px-2 py-1">{row.points}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        
-      ) : (
-        <p className="mt-2 text-gray-500">No standings yet.</p>
-      )}
-
-      <h2 className="text-xl font-semibold mt-6">Most Wins</h2>
-      {Array.isArray(mostWins) && mostWins.length > 0 ? (
-        <ul className="mt-2">
-          {mostWins.map((entry, i) => (
-            <li key={i} className="mb-1">
-              🏆 {entry.driver} ({entry.team}) - {entry.wins} win{entry.wins > 1 ? 's' : ''}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="mt-2 text-gray-500">No wins data yet.</p>
-      )}
-
-      <h2 className="text-xl font-semibold mt-6">Podiums (Top 3 of Each Race)</h2>
-      {Array.isArray(podiums) && podiums.length > 0 ? (
-        <div className="mt-2">
-          {podiums.map((race, idx) => (
-            <div key={idx} className="mb-4">
-              <div className="font-semibold">Race {idx + 1}</div>
-              <ol className="list-decimal ml-6">
-                {race.map((entry, i) => (
-                  <li key={i}>
-                    {entry.driver} ({entry.team}) - Pos {entry.pos}
-                  </li>
-                ))}
-              </ol>
+        {/* Results Section */}
+        {(standings.length > 0 || teamStandings.length > 0) && (
+          <div className="space-y-8">
+            {/* Standings Row */}
+            <div className="flex flex-col md:flex-row gap-8">
+              {/* Driver Standings */}
+              <div className="flex-1 bg-transparent rounded-2xl shadow-xl p-6 border border-gray-200 backdrop-blur-sm">
+                <h2 className="text-2xl font-bold text-white/95 mb-4 flex items-center">
+                  🏆 Driver Standings
+                </h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-gradient-to-r from-red-50 to-red-100">
+                        <th className="border-b border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Position</th>
+                        <th className="border-b border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Driver</th>
+                        <th className="border-b border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Team</th>
+                        <th className="border-b border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Points</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {standings.map((row, i) => (
+                        <tr key={i}>
+                          <td className="border-b border-gray-200 px-4 py-3 font-medium text-white/95">{i + 1}</td>
+                          <td className="border-b border-gray-200 px-4 py-3 font-medium text-white/95">{row.driver}</td>
+                          <td className="border-b border-gray-200 px-4 py-3 text-white/95">{row.team}</td>
+                          <td className="border-b border-gray-200 px-4 py-3 font-bold text-yellow-400">{row.points}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              {/* Team Standings */}
+              <div className="flex-1 bg-transparent rounded-2xl shadow-xl p-6 border border-gray-200 backdrop-blur-sm">
+                <h2 className="text-2xl font-bold text-white/95 mb-4 flex items-center">
+                  🏢 Team Standings
+                </h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-gradient-to-r from-red-50 to-red-100">
+                        <th className="border-b border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Position</th>
+                        <th className="border-b border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Team</th>
+                        <th className="border-b border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Points</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {teamStandings.map((row, i) => (
+                        <tr key={i}>
+                          <td className="border-b border-gray-200 px-4 py-3 font-medium text-white/95">{i + 1}</td>
+                          <td className="border-b border-gray-200 px-4 py-3 font-medium text-white/95">{row.team}</td>
+                          <td className="border-b border-gray-200 px-4 py-3 font-bold text-yellow-400">{row.points}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-          ))}
+            {/* Most Wins */}
+            {Array.isArray(mostWins) && mostWins.length > 0 && (
+              <div className="bg-transparent rounded-2xl shadow-xl p-6 border border-gray-200 backdrop-blur-sm">
+                <h2 className="text-2xl font-bold text-white/95 mb-4 flex items-center">
+                  🏅 Most Wins
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {mostWins.map((entry, i) => (
+                    <div key={i} className="bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-xl border border-yellow-200 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-semibold text-gray-800">{entry.driver}</div>
+                          <div className="text-sm text-gray-600">{entry.team}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-yellow-600">{entry.wins}</div>
+                          <div className="text-xs text-gray-500">win{entry.wins > 1 ? 's' : ''}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Most Fastest Laps (season summary) */}
+            {Array.isArray(mostFastestLaps) && mostFastestLaps.length > 0 && (
+              <div className="bg-transparent rounded-2xl shadow-xl p-6 border border-gray-200 backdrop-blur-sm">
+                <h2 className="text-2xl font-bold text-white/95 mb-4 flex items-center">
+                  ⚡ Most Fastest Laps (Season)
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {mostFastestLaps.map((entry, i) => (
+                    <div key={i} className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-xl border border-purple-200 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-semibold text-gray-800">{entry.driver}</div>
+                          <div className="text-sm text-gray-600">{entry.team}</div>
+                        </div>
+                        <div className="text-2xl font-bold text-purple-600">{entry.count}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Most Positions Gained & Fastest Lap per race */}
+            {(Array.isArray(positionsGained) && positionsGained.length > 0) || (Array.isArray(fastestLapPerRace) && fastestLapPerRace.length > 0) ? (
+              <div className="flex flex-col md:flex-row gap-8">
+                {/* Most Positions Gained */}
+                {Array.isArray(positionsGained) && positionsGained.length > 0 && (
+                  <div className="flex-1 bg-transparent rounded-2xl shadow-xl p-6 border border-gray-200 backdrop-blur-sm">
+                    <h2 className="text-2xl font-bold text-white/95 mb-4 flex items-center">
+                      ⬆️ Most Positions Gained (Per Race)
+                    </h2>
+                    <div className="space-y-3">
+                      {positionsGained.map((entry, i) => (
+                        <div key={i} className="flex items-center justify-between bg-gradient-to-r from-green-50 to-emerald-50 p-3 rounded-lg border border-green-200">
+                          <div>
+                            <div className="font-semibold text-gray-800">Race {entry.race}: {entry.driver}</div>
+                            <div className="text-sm text-gray-600">{entry.team}</div>
+                          </div>
+                          <div className="text-green-600 font-bold">+{entry.gained}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Fastest Lap Per Race */}
+                {Array.isArray(fastestLapPerRace) && fastestLapPerRace.length > 0 && (
+                  <div className="flex-1 bg-transparent rounded-2xl shadow-xl p-6 border border-gray-200 backdrop-blur-sm">
+                    <h2 className="text-2xl font-bold text-white/95 mb-4 flex items-center">
+                      ⚡ Fastest Lap (Per Race)
+                    </h2>
+                    <div className="space-y-3">
+                      {fastestLapPerRace.map((entry, i) => (
+                        <div key={i} className="flex items-center justify-between bg-gradient-to-r from-purple-50 to-pink-50 p-3 rounded-lg border border-purple-200">
+                          <div className="font-semibold text-gray-800">Race {entry.race}: {entry.driver} <span className="text-xs text-gray-600 ml-2">({entry.team})</span></div>
+                          <div className="text-purple-600 font-bold">{entry.lap_time}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+        )}
+            {/* Podiums */}
+            {Array.isArray(podiums) && podiums.length > 0 && (
+              <div className="bg-transparent rounded-2xl shadow-xl p-6 mt-8 border border-gray-200 backdrop-blur-sm">
+                <h2 className="text-2xl font-bold text-white/95 mb-4 flex items-center">
+                  🏁 Race Podiums
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {podiums.map((race, idx) => (
+                    <div key={idx} className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-200 shadow-sm">
+                      <h3 className="font-semibold text-gray-800 mb-3">Race {idx + 1}</h3>
+                      <div className="space-y-2">
+                        {race.map((entry, i) => (
+                          <div key={i} className="flex items-center justify-between p-2 bg-white/80 rounded-lg border border-gray-100">
+                            <div className="flex items-center space-x-2">
+                              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                                i === 0 ? 'bg-yellow-500 text-white' :
+                                i === 1 ? 'bg-gray-400 text-white' :
+                                'bg-orange-500 text-white'
+                              }`}>
+                                {i + 1}
+                              </div>
+                              <div>
+                                <div className="font-medium text-gray-800">{entry.driver}</div>
+                                <div className="text-xs text-gray-600">{entry.team}</div>
+                              </div>
+                            </div>
+                            <div className="text-sm font-medium text-gray-600">P{entry.pos}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+        {/* Instructions */}
+        <div className="bg-black/70 rounded-xl p-6 border border-red-900 mt-8">
+          <h3 className="text-lg font-semibold text-red-400 mb-2">📋 How to Use</h3>
+          <p className="text-gray-200">
+            Enter your friends&apos; names and current teams. If anyone switched names or teams during the season, 
+            add their previous information. Upload all your CSV race files and get the combined championship standings!
+          </p>
         </div>
-      ) : (
-        <p className="mt-2 text-gray-500">No podiums data yet.</p>
-      )}
-
-      <p className="mt-4 text-sm text-gray-500">
-        Enter your friends names and teams. If anyone switched, add their old name/team. Upload all CSVs and get the combined standings!
-      </p>
-    </main>
+      </main>
+    </div>
   );
 }
