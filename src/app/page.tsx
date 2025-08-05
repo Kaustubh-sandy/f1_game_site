@@ -207,10 +207,12 @@ export default function HomePage() {
       // Try the network IP first, fallback to localhost
       const urls = isLocalhost ? [
         'http://localhost:5000/upload',
-        'http://192.168.137.1:5000/upload'
+        'http://192.168.137.1:5000/upload',
+        'https://f1-champ-tracker.vercel.app/upload'
       ] : [
         'http://192.168.137.1:5000/upload',
-        'http://localhost:5000/upload'
+        'http://localhost:5000/upload',
+        'https://f1-champ-tracker.vercel.app/upload'
       ];
       
       console.log('Environment detected:', { isLocalhost, isHttps, hostname: window.location.hostname });
