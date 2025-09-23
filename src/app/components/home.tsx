@@ -28,6 +28,10 @@ type FastestCount = { driver: string; team: string; count: number };
 type PositionGain = { race: number; driver: string; team: string; gained: number };
 type FastestPerRace = { race: number; driver: string; team: string; lap_time: string };
 type PodiumEntry = { driver: string; team: string; pos: number };
+type PolePositionPerRace = { race: number; driver: string; team: string };
+type MostPolePositions = { driver: string; team: string; count: number };
+type MostPodiumFinishes = { driver: string; team: string; count: number };
+type TotalPenalties = { driver: string; team: string; count: number };
 
 export default function Home() {
   const [numPlayersInput, setNumPlayersInput] = useState('1');
@@ -40,6 +44,10 @@ export default function Home() {
   const [positionsGained, setPositionsGained] = useState<PositionGain[]>([]);
   const [fastestLapPerRace, setFastestLapPerRace] = useState<FastestPerRace[]>([]);
   const [mostFastestLaps, setMostFastestLaps] = useState<FastestCount[]>([]);
+  const [polePositionsPerRace, setPolePositionsPerRace] = useState<PolePositionPerRace[]>([]);
+  const [mostPolePositions, setMostPolePositions] = useState<MostPolePositions[]>([]);
+  const [mostPodiumFinishes, setMostPodiumFinishes] = useState<MostPodiumFinishes[]>([]);
+  const [totalPenalties, setTotalPenalties] = useState<TotalPenalties[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleNumPlayersChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -111,19 +119,19 @@ export default function Home() {
 
   const handleUpload = async () => {
     if (!csvFiles || csvFiles.length === 0) {
-      alert('⚠️ Please upload CSV files first!');
+      alert('Please upload CSV files first!');
       return;
     }
 
     const hasValidPlayers = players.some(player => player.currentName.trim() !== '' && player.currentTeam.trim() !== '');
     if (!hasValidPlayers) {
-      alert('⚠️ Please fill in at least one player configuration (name and team) before calculating standings!');
+      alert('Please fill in at least one player configuration (name and team) before calculating standings!');
       return;
     }
 
     const incompletePlayers = players.filter(player => player.currentName.trim() === '' || player.currentTeam.trim() === '');
     if (incompletePlayers.length > 0) {
-      alert(`⚠️ Please complete the configuration for ${incompletePlayers.length} player(s) (name and team are required)!`);
+      alert(`Please complete the configuration for ${incompletePlayers.length} player(s) (name and team are required)!`);
       return;
     }
 
@@ -133,9 +141,8 @@ export default function Home() {
     for (let i = 0; i < csvFiles.length; i++) formData.append('file', csvFiles[i]);
     formData.append('mapping', JSON.stringify(mapping));
 
-    // Try endpoints: prefer API Gateway /dev base (ANY) if available
-    const lambdaBase = 'https://6nb1io40l8.execute-api.ap-northeast-1.amazonaws.com/dev';
-    const urls = [lambdaBase, `${lambdaBase}/upload`, 'http://192.168.137.1:5000/upload', 'http://localhost:5000/upload', 'https://f-backend-deploy.onrender.com/upload'];
+    //const lambdaBase = 'https://6nb1io40l8.execute-api.ap-northeast-1.amazonaws.com/dev';
+    const urls = ['http://192.168.137.1:5000/upload', 'http://localhost:5000/upload', 'https://f-backend-deploy.onrender.com/upload'];  
 
     setIsLoading(true);
     try {
@@ -160,6 +167,10 @@ export default function Home() {
       setPositionsGained(data.positions_gained || []);
       setFastestLapPerRace(data.fastest_lap_per_race || []);
       setMostFastestLaps(data.most_fastest_laps || []);
+      setPolePositionsPerRace(data.pole_positions_per_race || []);
+      setMostPolePositions(data.most_pole_positions || []);
+      setMostPodiumFinishes(data.most_podium_finishes || []);
+      setTotalPenalties(data.total_penalties || []);
     } catch (err) {
       console.error('Upload error', err);
       alert('❌ Upload failed. Check console and try again.');
@@ -292,7 +303,19 @@ export default function Home() {
       {/* Results */}
       {(standings.length > 0 || teamStandings.length > 0) && (
         <div className="mt-8">
-          <ResultSection standings={standings} teamStandings={teamStandings} mostWins={mostWins} mostFastestLaps={mostFastestLaps} positionsGained={positionsGained} fastestLapPerRace={fastestLapPerRace} podiums={podiums} />
+          <ResultSection 
+          standings={standings} 
+          teamStandings={teamStandings} 
+          mostWins={mostWins} 
+          mostFastestLaps={mostFastestLaps} 
+          positionsGained={positionsGained} 
+          fastestLapPerRace={fastestLapPerRace} 
+          podiums={podiums}
+          polePositionsPerRace={polePositionsPerRace}
+          mostPolePositions={mostPolePositions}
+          mostPodiumFinishes={mostPodiumFinishes}
+          totalPenalties={totalPenalties}
+          />
         </div>
       )}
 

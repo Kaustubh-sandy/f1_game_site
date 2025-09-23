@@ -9,6 +9,10 @@ type FastestCount = { driver: string; team: string; count: number };
 type PositionGain = { race: number; driver: string; team: string; gained: number };
 type FastestPerRace = { race: number; driver: string; team: string; lap_time: string };
 type PodiumEntry = { driver: string; team: string; pos: number };
+type PolePositionPerRace = { race: number; driver: string; team: string };
+type MostPolePositions = { driver: string; team: string; count: number };
+type MostPodiumFinishes = { driver: string; team: string; count: number };
+type TotalPenalties = { driver: string; team: string; count: number };
 
 export default function ResultSection(props: {
   standings: StandingEntry[];
@@ -18,8 +22,17 @@ export default function ResultSection(props: {
   positionsGained: PositionGain[];
   fastestLapPerRace: FastestPerRace[];
   podiums: PodiumEntry[][];
+  polePositionsPerRace: PolePositionPerRace[];
+  mostPolePositions: MostPolePositions[];
+  mostPodiumFinishes: MostPodiumFinishes[];
+  totalPenalties: TotalPenalties[];
 }) {
-  const { standings, teamStandings, mostWins, mostFastestLaps, positionsGained, fastestLapPerRace, podiums } = props;
+  const { standings, teamStandings, mostWins, mostFastestLaps, positionsGained, fastestLapPerRace, podiums, polePositionsPerRace, mostPolePositions, mostPodiumFinishes, totalPenalties } = props;
+
+  // Debug logging for penalty data
+  console.log('Total Penalties Data:', totalPenalties);
+  console.log('Is totalPenalties array?', Array.isArray(totalPenalties));
+  console.log('totalPenalties length:', totalPenalties?.length);
 
   if (!(standings.length > 0 || teamStandings.length > 0)) return null;
 
@@ -156,6 +169,102 @@ export default function ResultSection(props: {
         </div>
       ) : null}
 
+      {/* Most Pole Positions & Most Podium Finishes */}
+      {(Array.isArray(mostPolePositions) && mostPolePositions.length > 0) || (Array.isArray(mostPodiumFinishes) && mostPodiumFinishes.length > 0) ? (
+        <div className="flex flex-col md:flex-row gap-8">
+          {/* Most Pole Positions */}
+          {Array.isArray(mostPolePositions) && mostPolePositions.length > 0 && (
+            <div className="flex-1 bg-transparent rounded-2xl shadow-xl p-6 border border-gray-200 backdrop-blur-sm">
+              <h2 className="text-2xl font-bold text-white/95 mb-4 flex items-center">🥇 Most Pole Positions</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {mostPolePositions.map((entry, i) => (
+                  <div key={i} className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-200 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-semibold text-gray-800">{entry.driver}</div>
+                        <div className="text-sm text-gray-600">{entry.team}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-blue-600">{entry.count}</div>
+                        <div className="text-xs text-gray-500">pole{entry.count > 1 ? 's' : ''}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Most Podium Finishes */}
+          {Array.isArray(mostPodiumFinishes) && mostPodiumFinishes.length > 0 && (
+            <div className="flex-1 bg-transparent rounded-2xl shadow-xl p-6 border border-gray-200 backdrop-blur-sm">
+              <h2 className="text-2xl font-bold text-white/95 mb-4 flex items-center">🏆 Most Podium Finishes</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {mostPodiumFinishes.map((entry, i) => (
+                  <div key={i} className="bg-gradient-to-r from-amber-50 to-yellow-50 p-4 rounded-xl border border-amber-200 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-semibold text-gray-800">{entry.driver}</div>
+                        <div className="text-sm text-gray-600">{entry.team}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-amber-600">{entry.count}</div>
+                        <div className="text-xs text-gray-500">podium{entry.count > 1 ? 's' : ''}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {/* Pole Positions Per Race & Total Penalties */}
+      {(Array.isArray(polePositionsPerRace) && polePositionsPerRace.length > 0) || (Array.isArray(totalPenalties) && totalPenalties.length > 0) ? (
+        <div className="flex flex-col md:flex-row gap-8">
+          {/* Pole Positions Per Race */}
+          {Array.isArray(polePositionsPerRace) && polePositionsPerRace.length > 0 && (
+            <div className="flex-1 bg-transparent rounded-2xl shadow-xl p-6 border border-gray-200 backdrop-blur-sm">
+              <h2 className="text-2xl font-bold text-white/95 mb-4 flex items-center">🏁 Pole Position (Per Race)</h2>
+              <div className="space-y-3">
+                {polePositionsPerRace.map((entry, i) => (
+                  <div key={i} className="flex items-center justify-between bg-gradient-to-r from-blue-50 to-cyan-50 p-3 rounded-lg border border-blue-200">
+                    <div>
+                      <div className="font-semibold text-gray-800">Race {entry.race}: {entry.driver}</div>
+                      <div className="text-sm text-gray-600">{entry.team}</div>
+                    </div>
+                    <div className="text-blue-600 font-bold">P1</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Total Penalties */}
+          {Array.isArray(totalPenalties) && totalPenalties.length > 0 && (
+            <div className="flex-1 bg-transparent rounded-2xl shadow-xl p-6 border border-gray-200 backdrop-blur-sm">
+              <h2 className="text-2xl font-bold text-white/95 mb-4 flex items-center">⚠️ Total Penalties</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {totalPenalties.map((entry, i) => (
+                  <div key={i} className="bg-gradient-to-r from-red-50 to-pink-50 p-4 rounded-xl border border-red-200 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-semibold text-gray-800">{entry.driver}</div>
+                        <div className="text-sm text-gray-600">{entry.team}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-red-600">{entry.count}</div>
+                        <div className="text-xs text-gray-500">penalt{entry.count > 1 ? 'ies' : 'y'}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      
       {/* Podiums */}
       {Array.isArray(podiums) && podiums.length > 0 && (
         <div className="bg-transparent rounded-2xl shadow-xl p-6 mt-8 border border-gray-200 backdrop-blur-sm">
